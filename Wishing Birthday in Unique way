@@ -51,7 +51,7 @@ void clear_screen() {
 
 // Print the message in the center of the heart
 void print_center_message() {
-    const char *msg = "Happy Birthday Ruchi";
+    const char *msg = "Happy Birthday ";
     int msg_len = strlen(msg);
     int center_x = WIDTH / 2 - msg_len / 2;
     int center_y = HEIGHT / 2;
