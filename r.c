@@ -1,0 +1,112 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
+#include <math.h>
+#include <time.h>
+#include <string.h>
+
+#define HEART_POINTS 100
+#define WIDTH 80
+#define HEIGHT 24
+
+// Returns a random character from the set
+char getCHAR() {
+    char ok[] = "~!@#$%^&*:;'\",{}|<>=abcdefghijklmnopqrstuvwxyz";
+    return ok[rand() % (sizeof(ok) - 1)];
+}
+
+// Non-blocking keypress check
+int kbhit(void) {
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+    ch = getchar();
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+    if (ch != EOF) {
+        ungetc(ch, stdin);
+        return 1;
+    }
+    return 0;
+}
+
+// Move cursor to (x, y)
+void gotoxy(int x, int y) {
+    printf("\033[%d;%dH", y, x);
+}
+
+// Clear screen
+void clear_screen() {
+    printf("\033[2J");
+    fflush(stdout);
+}
+
+// Print the message in the center of the heart
+void print_center_message() {
+    const char *msg = "Happy Birthday Ruchi";
+    int msg_len = strlen(msg);
+    int center_x = WIDTH / 2 - msg_len / 2;
+    int center_y = HEIGHT / 2;
+    // Colorful, bold text (cycling color)
+    for (int i = 0; i < msg_len; ++i) {
+        gotoxy(center_x + i, center_y);
+        printf("\033[1;%dm%c\033[0m", 31 + (i % 7), msg[i]);
+    }
+    fflush(stdout);
+}
+
+int main() {
+    int i;
+    double t;
+    int x[HEART_POINTS], y[HEART_POINTS];
+    srand(time(NULL));
+    clear_screen();
+
+    // Precompute heart shape points
+    for (i = 0; i < HEART_POINTS; ++i) {
+        t = (double)i / HEART_POINTS * 2 * M_PI;
+        // Heart parametric equations
+        double xt = 16 * pow(sin(t), 3);
+        double yt = 13 * cos(t) - 5 * cos(2 * t) - 2 * cos(3 * t) - cos(4 * t);
+        // Scale and center
+        x[i] = (int)(WIDTH / 2 + xt * 2.5);
+        y[i] = (int)(HEIGHT / 2 - yt * 1.2);
+    }
+
+    int frame = 0;
+    while (!kbhit()) {
+        for (i = 0; i < HEART_POINTS; ++i) {
+            // Avoid overwriting the message row
+            int msg_y = HEIGHT / 2;
+            int msg_len = strlen("Happy Birthday Ruchi");
+            int msg_x_start = WIDTH / 2 - msg_len / 2;
+            if (y[(i + frame) % HEART_POINTS] == msg_y &&
+                x[(i + frame) % HEART_POINTS] >= msg_x_start &&
+                x[(i + frame) % HEART_POINTS] < msg_x_start + msg_len) {
+                continue; // skip message area
+            }
+            // Color cycling
+            printf("\033[1;%dm", 31 + (i % 7)); // 31-37: red to white
+            gotoxy(x[(i + frame) % HEART_POINTS], y[(i + frame) % HEART_POINTS]);
+            printf("%c", getCHAR());
+        }
+        // Print the message in the center
+        print_center_message();
+        fflush(stdout);
+        usleep(50000);
+        clear_screen();
+        frame++;
+    }
+    printf("\033[0m"); // Reset color
+    gotoxy(1, HEIGHT);
+    printf("\n");
+    return 0;
+}
